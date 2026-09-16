@@ -65,3 +65,8 @@ Nothing is sent on load or unload. Details in [docs/safety.md](docs/safety.md).
 
 Protocol reverse engineering by [841973620](https://github.com/Z841973620/dgx-spark-fan-override)
 and [xXLegionBinFrogXx](https://github.com/xXLegionBinFrogXx/gb10-fan-control). GPL-2.0.
+
+---
+
+Use at your own risk. This drives the EC of your machine through an undocumented
+interface; no warranty, and any damage is yours. Tested on one DGX Spark.
