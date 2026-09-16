@@ -6,7 +6,8 @@
 //!   sparkfan max                    fan1 max (13500 on Spark)
 //!   sparkfan daemon [curve]         stock curve until the board creeps, then hold a floor
 //!        curve = "75:6000,80:9000,85:13500"  (default), auto below the first point,
-//!        up instantly, down only after 60 s below (threshold - 5 C), poll 5 s
+//!        temperature is EMA-smoothed (tau 20 s); up instantly on the smoothed value,
+//!        down only after 60 s below (threshold - 5 C); poll 5 s
 //!
 //! Build: rustc -O main.rs -o sparkfan   (std only). Needs root for set/auto/max/daemon.
 
@@ -18,6 +19,7 @@ const DEFAULT_CURVE: &str = "75:6000,80:9000,85:13500";
 const HYST_C: f64 = 5.0;
 const POLL_S: u64 = 5;
 const HOLD_DOWN_S: u64 = 60; // a lower floor is only applied after the temperature stayed low this long
+const EMA_TAU_S: f64 = 20.0; // sensor smoothing time constant; bursty loads swing the raw reading 10+ C
 
 fn die(msg: &str) -> ! {
     eprintln!("sparkfan: {msg}");
@@ -92,6 +94,17 @@ fn parse_curve(s: &str) -> Vec<(f64, u32)> {
     v
 }
 
+/// Exponential moving average with time constant `tau` seconds, sampled every `dt` seconds.
+fn ema(prev: Option<f64>, x: f64, dt: f64, tau: f64) -> f64 {
+    match prev {
+        None => x,
+        Some(p) => {
+            let a = 1.0 - (-dt / tau).exp();
+            p + a * (x - p)
+        }
+    }
+}
+
 /// Floor for a temperature: highest curve point whose threshold is reached; 0 = auto.
 fn floor_for(curve: &[(f64, u32)], t: f64) -> u32 {
     curve.iter().filter(|(th, _)| t >= *th).map(|(_, r)| *r).last().unwrap_or(0)
@@ -101,10 +114,13 @@ fn daemon(curve: Vec<(f64, u32)>) {
     let g = gate();
     let mut current: u32 = u32::MAX; // unknown
     let mut low_since: Option<std::time::Instant> = None; // when the temperature first allowed a step down
-    eprintln!("sparkfan daemon: curve {curve:?}, hysteresis {HYST_C} C, hold-down {HOLD_DOWN_S} s, poll {POLL_S} s, gate {}", g.display());
+    let mut smooth: Option<f64> = None;
+    eprintln!("sparkfan daemon: curve {curve:?}, ema {EMA_TAU_S} s, hysteresis {HYST_C} C, hold-down {HOLD_DOWN_S} s, poll {POLL_S} s, gate {}", g.display());
     loop {
         let (board, gpu) = temps();
-        let t = board.max(gpu.unwrap_or(-1.0));
+        let raw = board.max(gpu.unwrap_or(-1.0));
+        let t = ema(smooth, raw, POLL_S as f64, EMA_TAU_S);
+        smooth = Some(t);
         let mut want = floor_for(&curve, t);
         if current != u32::MAX && want < current {
             // step down only when HYST_C below the threshold that earned the current floor,
@@ -125,7 +141,7 @@ fn daemon(curve: Vec<(f64, u32)>) {
         if want != current {
             let v = if want == 0 { "auto".to_string() } else { want.to_string() };
             write_floor(&g, &v);
-            eprintln!("sparkfan: board {board:.0} C gpu {} -> floor {v} (was {})", gpu.map(|g| format!("{g:.0} C")).unwrap_or("n/a".into()), if current == u32::MAX { "unknown".into() } else { current.to_string() });
+            eprintln!("sparkfan: smoothed {t:.0} C (board {board:.0}, gpu {}) -> floor {v} (was {})", gpu.map(|g| format!("{g:.0}")).unwrap_or("n/a".into()), if current == u32::MAX { "unknown".into() } else { current.to_string() });
             current = want;
             low_since = None;
         }
@@ -177,6 +193,17 @@ mod tests {
         assert_eq!(parse_rpm("011f00008c0ad20f0000"), Some((2700, 4050)));
         assert_eq!(parse_rpm("011f00002823ce220000"), Some((9000, 8910)));
         assert_eq!(parse_rpm("error 5"), None);
+    }
+
+    #[test]
+    fn ema_smooths_bursts() {
+        let mut s = None;
+        for x in [80.0, 70.0, 80.0, 70.0, 80.0, 70.0] {
+            s = Some(ema(s, x, 5.0, 20.0));
+        }
+        let v = s.unwrap();
+        assert!(v > 73.0 && v < 78.0, "{v}"); // a 10 C square wave settles near its mean
+        assert_eq!(ema(None, 42.0, 5.0, 20.0), 42.0); // first sample passes through
     }
 
     #[test]
