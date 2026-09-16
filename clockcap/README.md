@@ -1,4 +1,4 @@
-# Optional: cap the GPU clock
+# clockcap: optional GPU clock cap
 
 The fan floor keeps a loaded DGX Spark around 80–86 °C. That is normal, but it
 leaves little margin for a workload that does not pace itself. A clock cap is
