@@ -43,7 +43,7 @@ Secure Boot is on by default on the Spark: sign the module once with your own ke
 see [docs/secure-boot.md](docs/secure-boot.md). Then:
 
 ```
-sudo install -m 644 build/kmod/sparkfan.ko /lib/modules/$(uname -r)/extra/ && sudo depmod -a
+sudo mkdir -p /lib/modules/$(uname -r)/extra && sudo install -m 644 build/kmod/sparkfan.ko /lib/modules/$(uname -r)/extra/ && sudo depmod -a
 sudo install -m 755 build/cli/release/sparkfan /usr/local/bin/
 sudo modprobe sparkfan && sudo sparkfan set 9000
 sudo install -m 644 sparkfan.service /etc/systemd/system/ && sudo systemctl enable --now sparkfan
