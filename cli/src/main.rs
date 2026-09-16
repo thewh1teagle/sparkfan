@@ -6,7 +6,7 @@
 //!   sparkfan max                    fan1 max (13500 on Spark)
 //!   sparkfan daemon [curve]         stock curve until the board creeps, then hold a floor
 //!        curve = "75:6000,80:9000,85:13500"  (default), auto below the first point,
-//!        hysteresis 5 C on the way down, poll 5 s
+//!        up instantly, down only after 60 s below (threshold - 5 C), poll 5 s
 //!
 //! Build: rustc -O main.rs -o sparkfan   (std only). Needs root for set/auto/max/daemon.
 
@@ -17,6 +17,7 @@ const THERMAL: &str = "/sys/class/thermal";
 const DEFAULT_CURVE: &str = "75:6000,80:9000,85:13500";
 const HYST_C: f64 = 5.0;
 const POLL_S: u64 = 5;
+const HOLD_DOWN_S: u64 = 60; // a lower floor is only applied after the temperature stayed low this long
 
 fn die(msg: &str) -> ! {
     eprintln!("sparkfan: {msg}");
@@ -99,23 +100,34 @@ fn floor_for(curve: &[(f64, u32)], t: f64) -> u32 {
 fn daemon(curve: Vec<(f64, u32)>) {
     let g = gate();
     let mut current: u32 = u32::MAX; // unknown
-    eprintln!("sparkfan daemon: curve {curve:?}, hysteresis {HYST_C} C, poll {POLL_S} s, gate {}", g.display());
+    let mut low_since: Option<std::time::Instant> = None; // when the temperature first allowed a step down
+    eprintln!("sparkfan daemon: curve {curve:?}, hysteresis {HYST_C} C, hold-down {HOLD_DOWN_S} s, poll {POLL_S} s, gate {}", g.display());
     loop {
         let (board, gpu) = temps();
         let t = board.max(gpu.unwrap_or(-1.0));
         let mut want = floor_for(&curve, t);
-        // hysteresis: only step down once we are HYST_C below the threshold that earned the current floor
         if current != u32::MAX && want < current {
+            // step down only when HYST_C below the threshold that earned the current floor,
+            // and only after that has held for HOLD_DOWN_S (load gaps cool the board for seconds at a time)
             let th = curve.iter().find(|(_, r)| *r == current).map(|(th, _)| *th).unwrap_or(f64::MAX);
             if t > th - HYST_C {
+                low_since = None;
                 want = current;
+            } else {
+                let since = *low_since.get_or_insert_with(std::time::Instant::now);
+                if since.elapsed().as_secs() < HOLD_DOWN_S {
+                    want = current;
+                }
             }
+        } else {
+            low_since = None;
         }
         if want != current {
             let v = if want == 0 { "auto".to_string() } else { want.to_string() };
             write_floor(&g, &v);
             eprintln!("sparkfan: board {board:.0} C gpu {} -> floor {v} (was {})", gpu.map(|g| format!("{g:.0} C")).unwrap_or("n/a".into()), if current == u32::MAX { "unknown".into() } else { current.to_string() });
             current = want;
+            low_since = None;
         }
         let fault = read(&g, "fault");
         if fault != "0" {
