@@ -30,6 +30,7 @@ below 75 °C and only steps in when the board creeps.
 | `kmod/` | C kernel gate: sysfs `floor` `caps` `telemetry` `fault` on the EC FF-A device |
 | `cli/` | Rust CLI and daemon, std only |
 | `sparkfan.service` | systemd unit for the daemon |
+| `gpu-clock-cap.sh` | optional system-wide GPU clock cap, see docs |
 | `docs/` | signing, protocol, safety |
 
 ## Build and install
@@ -60,6 +61,7 @@ Nothing is sent on load or unload. Details in [docs/safety.md](docs/safety.md).
 
 - [docs/protocol.md](docs/protocol.md): the EC mailbox, byte by byte
 - [docs/secure-boot.md](docs/secure-boot.md): sign the module, keep Secure Boot on
+- [docs/gpu-clock-cap.md](docs/gpu-clock-cap.md): optional clock cap for extra headroom (2400 MHz suggested)
 
 Protocol reverse engineering by [841973620](https://github.com/Z841973620/dgx-spark-fan-override)
 and [xXLegionBinFrogXx](https://github.com/xXLegionBinFrogXx/gb10-fan-control). GPL-2.0.

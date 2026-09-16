@@ -1,0 +1,10 @@
+[Unit]
+Description=Cap GPU SM clock (DGX Spark thermal headroom)
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gpu-clock-cap.sh 2400
+RemainAfterExit=yes
+ExecStop=/usr/local/bin/gpu-clock-cap.sh reset
+[Install]
+WantedBy=multi-user.target
