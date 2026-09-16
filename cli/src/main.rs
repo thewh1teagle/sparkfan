@@ -4,8 +4,9 @@
 //!   sparkfan set 9000               request a fan RPM floor
 //!   sparkfan auto                   hand the floor back to the EC curve
 //!   sparkfan max                    fan1 max (13500 on Spark)
-//!   sparkfan daemon [curve]         hold a floor from the board temperature, forever
-//!        curve = "60:3000,70:6000,80:9000,88:13500"  (default), hysteresis 5 C, poll 5 s
+//!   sparkfan daemon [curve]         stock curve until the board creeps, then hold a floor
+//!        curve = "75:6000,80:9000,85:13500"  (default), auto below the first point,
+//!        hysteresis 5 C on the way down, poll 5 s
 //!
 //! Build: rustc -O main.rs -o sparkfan   (std only). Needs root for set/auto/max/daemon.
 
@@ -13,7 +14,7 @@ use std::{env, fs, path::PathBuf, process, thread, time::Duration};
 
 const FFA_BUS: &str = "/sys/bus/arm_ffa/devices";
 const THERMAL: &str = "/sys/class/thermal";
-const DEFAULT_CURVE: &str = "60:3000,70:6000,80:9000,88:13500";
+const DEFAULT_CURVE: &str = "75:6000,80:9000,85:13500";
 const HYST_C: f64 = 5.0;
 const POLL_S: u64 = 5;
 
@@ -175,8 +176,8 @@ mod tests {
     #[test]
     fn floor_picks_highest_reached_threshold() {
         let c = parse_curve(DEFAULT_CURVE);
-        assert_eq!(floor_for(&c, 20.0), 0); // below everything = auto
-        assert_eq!(floor_for(&c, 60.0), 3000);
+        assert_eq!(floor_for(&c, 70.0), 0); // stock curve until the first point
+        assert_eq!(floor_for(&c, 75.0), 6000);
         assert_eq!(floor_for(&c, 79.9), 6000);
         assert_eq!(floor_for(&c, 80.0), 9000);
         assert_eq!(floor_for(&c, 120.0), 13500);
@@ -191,7 +192,7 @@ mod tests {
         let decide = |t: f64| { let w = floor_for(&c, t); if w < current && t > th - HYST_C { current } else { w } };
         assert_eq!(decide(78.0), 9000); // within hysteresis band
         assert_eq!(decide(75.0), 6000); // cooled enough
-        assert_eq!(decide(85.0), 9000);
-        assert_eq!(decide(90.0), 13500); // stepping up is immediate
+        assert_eq!(decide(84.0), 9000);
+        assert_eq!(decide(85.0), 13500); // stepping up is immediate
     }
 }

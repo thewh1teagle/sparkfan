@@ -16,7 +16,7 @@ What sparkfan can do to the machine: raise the fan RPM floor. Nothing else.
 
 ## Gates in the daemon
 
-- Only raises or lowers the floor along the curve you pass; default `60:3000,70:6000,80:9000,88:13500` on the hottest of board zones / GPU.
+- Stock curve (floor auto) below the first curve point; default `75:6000,80:9000,85:13500` on the hottest of board zones / GPU.
 - 5 °C hysteresis on the way down, immediate on the way up.
 - Exits on a latched fault instead of retrying.
 

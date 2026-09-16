@@ -12,12 +12,16 @@ sudo sparkfan set 9000     # fans never below 9000 rpm (valid 1260–13500)
 sudo sparkfan max          # 13500 rpm, loud
 sudo sparkfan auto         # back to the stock curve
 sudo sparkfan status       # caps, floor, measured fan RPM, fault, temps
-sudo sparkfan daemon       # floor follows board temperature: 60 °C→3000, 70→6000, 80→9000, 88→13500
+sudo sparkfan daemon       # stock curve until 75 °C, then 6000 → 9000 (80 °C) → 13500 (85 °C)
 ```
 
 The number is a floor in rpm: the EC keeps running its own curve, but never
 below that. Higher floor, more air, more noise. 9000 is a good working level,
 that's fan0 at 100 % and fan1 at two thirds.
+
+The daemon exists because the stock curve reacts too late on some units (54 %
+fan at 90 °C, 75 % at 95 °C, then a hard thermal reset). It leaves the EC alone
+below 75 °C and only steps in when the board creeps.
 
 ## Layout
 
