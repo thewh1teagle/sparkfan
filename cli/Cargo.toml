@@ -1,0 +1,12 @@
+[package]
+name = "sparkfan"
+version = "0.1.0"
+edition = "2021"
+description = "DGX Spark fan floor control (userspace side of the sparkfan kernel gate)"
+license = "GPL-2.0-only"
+
+[dependencies]
+
+[profile.release]
+strip = true
+lto = true

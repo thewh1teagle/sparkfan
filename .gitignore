@@ -1,0 +1,7 @@
+build/
+plans/
+MOK.priv
+MOK.der
+*.ko
+*.o
+.*.cmd

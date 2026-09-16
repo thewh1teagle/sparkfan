@@ -1,0 +1,9 @@
+[Unit]
+Description=sparkfan: fan floor from board temperature (DGX Spark)
+After=multi-user.target
+[Service]
+ExecStartPre=/sbin/modprobe sparkfan
+ExecStart=/usr/local/bin/sparkfan daemon
+Restart=always
+[Install]
+WantedBy=multi-user.target
